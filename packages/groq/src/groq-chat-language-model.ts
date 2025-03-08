@@ -481,6 +481,7 @@ const groqChatResponseSchema = z.object({
       message: z.object({
         role: z.literal('assistant').nullish(),
         content: z.string().nullish(),
+        reasoning: z.string().nullish(),
         tool_calls: z
           .array(
             z.object({
@@ -519,6 +520,7 @@ const groqChatChunkSchema = z.union([
           .object({
             role: z.enum(['assistant']).nullish(),
             content: z.string().nullish(),
+            reasoning: z.string().nullish(),
             tool_calls: z
               .array(
                 z.object({
