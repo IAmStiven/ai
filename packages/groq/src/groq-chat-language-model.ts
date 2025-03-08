@@ -282,6 +282,8 @@ export class GroqChatLanguageModel implements LanguageModelV1 {
     let isFirstChunk = true;
 
     let providerMetadata: LanguageModelV1ProviderMetadata | undefined;
+    let isReasoning = false;
+
     return {
       stream: response.pipeThrough(
         new TransformStream<
@@ -337,8 +339,17 @@ export class GroqChatLanguageModel implements LanguageModelV1 {
             if (delta.content != null) {
               controller.enqueue({
                 type: 'text-delta',
-                textDelta: delta.content,
+                textDelta: (isReasoning ? "</think>" : "") + delta.content
               });
+              isReasoning = false;
+            }
+
+            if (delta.reasoning != null) {
+              controller.enqueue({
+                type: 'text-delta',
+                textDelta: (isReasoning ? "" : "<think>") + delta.reasoning
+              });
+              isReasoning = true;
             }
 
             if (delta.tool_calls != null) {
