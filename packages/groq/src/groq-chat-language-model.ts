@@ -72,6 +72,7 @@ export class GroqChatLanguageModel implements LanguageModelV1 {
     presencePenalty,
     stopSequences,
     responseFormat,
+    reasoningFormat,
     seed,
     stream,
   }: Parameters<LanguageModelV1['doGenerate']>[0] & {
@@ -123,6 +124,7 @@ export class GroqChatLanguageModel implements LanguageModelV1 {
         stream === false && responseFormat?.type === 'json'
           ? { type: 'json_object' }
           : undefined,
+      reasoning_format: reasoningFormat,
 
       // messages:
       messages: convertToGroqChatMessages(prompt),
