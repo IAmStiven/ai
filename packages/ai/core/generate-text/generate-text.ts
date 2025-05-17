@@ -117,6 +117,7 @@ export async function generateText<
   experimental_activeTools: activeTools,
   experimental_prepareStep: prepareStep,
   experimental_repairToolCall: repairToolCall,
+  experimental_prepareToolCall: prepareToolCall,
   _internal: {
     generateId = originalGenerateId,
     currentDate = () => new Date(),
@@ -182,10 +183,10 @@ If you return undefined (or for undefined settings), the settings from the outer
       model: LanguageModel;
     }) => PromiseLike<
       | {
-          model?: LanguageModel;
-          toolChoice?: ToolChoice<NoInfer<TOOLS>>;
-          experimental_activeTools?: Array<keyof NoInfer<TOOLS>>;
-        }
+        model?: LanguageModel;
+        toolChoice?: ToolChoice<NoInfer<TOOLS>>;
+        experimental_activeTools?: Array<keyof NoInfer<TOOLS>>;
+      }
       | undefined
     >;
 
@@ -194,6 +195,10 @@ A function that attempts to repair a tool call that failed to parse.
      */
     experimental_repairToolCall?: ToolCallRepairFunction<NoInfer<TOOLS>>;
 
+    /**
+    Optional functopn that you can use to modify the tool call before the function is called.
+    */
+    experimental_prepareToolCall?: (args: any, context: { toolCallId: string, toolName: string, messages: ModelMessage[], abortSignal: AbortSignal | undefined, [key: string]: any }) => PromiseLike<[any, { toolCallId: string, toolName: string, messages: ModelMessage[], abortSignal: AbortSignal | undefined, [key: string]: any }]>;
     /**
     Callback that is called when each step (LLM call) is finished, including intermediate steps.
     */
@@ -413,13 +418,14 @@ A function that attempts to repair a tool call that failed to parse.
           tools == null
             ? []
             : await executeTools({
-                toolCalls: currentToolCalls,
-                tools,
-                tracer,
-                telemetry,
-                messages: stepInputMessages,
-                abortSignal,
-              });
+              toolCalls: currentToolCalls,
+              tools,
+              tracer,
+              telemetry,
+              messages: stepInputMessages,
+              abortSignal,
+              prepareToolCall,
+            });
 
         // content:
         const stepContent = asContent({
@@ -512,6 +518,7 @@ async function executeTools<TOOLS extends ToolSet>({
   telemetry,
   messages,
   abortSignal,
+  prepareToolCall,
 }: {
   toolCalls: ToolCallArray<TOOLS>;
   tools: TOOLS;
@@ -519,6 +526,7 @@ async function executeTools<TOOLS extends ToolSet>({
   telemetry: TelemetrySettings | undefined;
   messages: ModelMessage[];
   abortSignal: AbortSignal | undefined;
+  prepareToolCall?: (args: any, context: { toolCallId: string, toolName: string, messages: ModelMessage[], abortSignal: AbortSignal | undefined, [key: string]: any }) => PromiseLike<[any, { toolCallId: string, toolName: string, messages: ModelMessage[], abortSignal: AbortSignal | undefined, [key: string]: any }]>;
 }): Promise<ToolResultArray<TOOLS>> {
   const toolResults = await Promise.all(
     toolCalls.map(async ({ toolCallId, toolName, args }) => {
@@ -546,12 +554,20 @@ async function executeTools<TOOLS extends ToolSet>({
         }),
         tracer,
         fn: async span => {
+          const [newArgs, newContext] = prepareToolCall ? await prepareToolCall(args, {
+            toolCallId,
+            toolName,
+            messages,
+            abortSignal,
+          }) : [args, {
+            toolCallId,
+            toolName,
+            messages,
+            abortSignal,
+          }];
+
           try {
-            const result = await tool.execute!(args, {
-              toolCallId,
-              messages,
-              abortSignal,
-            });
+            const result = await tool.execute!(newArgs, newContext);
 
             try {
               span.setAttributes(
@@ -599,8 +615,7 @@ async function executeTools<TOOLS extends ToolSet>({
 }
 
 class DefaultGenerateTextResult<TOOLS extends ToolSet, OUTPUT>
-  implements GenerateTextResult<TOOLS, OUTPUT>
-{
+  implements GenerateTextResult<TOOLS, OUTPUT> {
   readonly steps: GenerateTextResult<TOOLS, OUTPUT>['steps'];
 
   private readonly resolvedOutput: OUTPUT;
