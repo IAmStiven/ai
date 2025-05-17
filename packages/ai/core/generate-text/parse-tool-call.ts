@@ -18,6 +18,7 @@ export async function parseToolCall<TOOLS extends ToolSet>({
   repairToolCall,
   system,
   messages,
+  prepareToolCall,
 }: {
   toolCall: LanguageModelV2ToolCall;
   tools: TOOLS | undefined;

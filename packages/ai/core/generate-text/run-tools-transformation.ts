@@ -59,6 +59,7 @@ export function runToolsTransformation<TOOLS extends ToolSet>({
   messages,
   abortSignal,
   repairToolCall,
+  prepareToolCall,
 }: {
   tools: TOOLS | undefined;
   generatorStream: ReadableStream<LanguageModelV2StreamPart>;
@@ -69,6 +70,27 @@ export function runToolsTransformation<TOOLS extends ToolSet>({
   messages: ModelMessage[];
   abortSignal: AbortSignal | undefined;
   repairToolCall: ToolCallRepairFunction<TOOLS> | undefined;
+  prepareToolCall?: (
+    args: any,
+    context: {
+      toolCallId: string;
+      toolName: string;
+      messages: ModelMessage[];
+      abortSignal: AbortSignal | undefined;
+      [key: string | number | symbol]: any;
+    },
+  ) => PromiseLike<
+    [
+      any,
+      {
+        toolCallId: string;
+        toolName: string;
+        messages: ModelMessage[];
+        abortSignal: AbortSignal | undefined;
+        [key: string | number | symbol]: any;
+      },
+    ]
+  >;
 }): ReadableStream<SingleRequestTextStreamPart<TOOLS>> {
   // tool results stream
   let toolResultsStreamController: ReadableStreamDefaultController<
@@ -207,12 +229,25 @@ export function runToolsTransformation<TOOLS extends ToolSet>({
                   },
                 }),
                 tracer,
-                fn: async span =>
-                  tool.execute!(toolCall.args, {
-                    toolCallId: toolCall.toolCallId,
-                    messages,
-                    abortSignal,
-                  }).then(
+                fn: async span => {
+                  const [newArgs, newContext] = prepareToolCall
+                    ? await prepareToolCall(toolCall.args, {
+                        toolCallId: toolCall.toolCallId,
+                        toolName: toolCall.toolName,
+                        messages,
+                        abortSignal,
+                      })
+                    : [
+                        toolCall.args,
+                        {
+                          toolCallId: toolCall.toolCallId,
+                          toolName: toolCall.toolName,
+                          messages,
+                          abortSignal,
+                        },
+                      ];
+
+                  return tool.execute!(newArgs, newContext).then(
                     (result: any) => {
                       toolResultsStreamController!.enqueue({
                         ...toolCall,
@@ -257,7 +292,8 @@ export function runToolsTransformation<TOOLS extends ToolSet>({
                       outstandingToolResults.delete(toolExecutionId);
                       attemptClose();
                     },
-                  ),
+                  );
+                },
               });
             }
           } catch (error) {

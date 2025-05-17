@@ -24,6 +24,7 @@ import { createStitchableStream } from '../../src/util/create-stitchable-stream'
 import { DelayedPromise } from '../../src/util/delayed-promise';
 import { now as originalNow } from '../../src/util/now';
 import { prepareRetries } from '../../src/util/prepare-retries';
+import { ModelMessage } from '../prompt';
 import { CallSettings } from '../prompt/call-settings';
 import { convertToLanguageModelPrompt } from '../prompt/convert-to-language-model-prompt';
 import { prepareCallSettings } from '../prompt/prepare-call-settings';
@@ -209,6 +210,7 @@ export function streamText<
   toolCallStreaming = experimental_toolCallStreaming,
   experimental_activeTools: activeTools,
   experimental_repairToolCall: repairToolCall,
+  experimental_prepareToolCall: prepareToolCall,
   experimental_transform: transform,
   onChunk,
   onError,
@@ -273,7 +275,30 @@ Optional specification for parsing structured outputs from the LLM response.
 A function that attempts to repair a tool call that failed to parse.
      */
     experimental_repairToolCall?: ToolCallRepairFunction<TOOLS>;
-
+    /**
+    Optional functopn that you can use to modify the tool call before the function is called.
+    */
+    experimental_prepareToolCall?: (
+      args: any,
+      context: {
+        toolCallId: string;
+        toolName: string;
+        messages: ModelMessage[];
+        abortSignal: AbortSignal | undefined;
+        [key: string | number | symbol]: any;
+      },
+    ) => PromiseLike<
+      [
+        any,
+        {
+          toolCallId: string;
+          toolName: string;
+          messages: ModelMessage[];
+          abortSignal: AbortSignal | undefined;
+          [key: string | number | symbol]: any;
+        },
+      ]
+    >;
     /**
 Enable streaming of tool call deltas as they are generated. Disabled by default.
      */
@@ -344,6 +369,7 @@ Internal. For test use only. May change without notice.
     transforms: asArray(transform),
     activeTools,
     repairToolCall,
+    prepareToolCall,
     maxSteps,
     output,
     providerOptions,
@@ -483,6 +509,7 @@ class DefaultStreamTextResult<TOOLS extends ToolSet, OUTPUT, PARTIAL_OUTPUT>
     transforms,
     activeTools,
     repairToolCall,
+    prepareToolCall,
     maxSteps,
     output,
     providerOptions,
@@ -509,6 +536,27 @@ class DefaultStreamTextResult<TOOLS extends ToolSet, OUTPUT, PARTIAL_OUTPUT>
     transforms: Array<StreamTextTransform<TOOLS>>;
     activeTools: Array<keyof TOOLS> | undefined;
     repairToolCall: ToolCallRepairFunction<TOOLS> | undefined;
+    prepareToolCall?: (
+      args: any,
+      context: {
+        toolCallId: string;
+        toolName: string;
+        messages: ModelMessage[];
+        abortSignal: AbortSignal | undefined;
+        [key: string | number | symbol]: any;
+      },
+    ) => PromiseLike<
+      [
+        any,
+        {
+          toolCallId: string;
+          toolName: string;
+          messages: ModelMessage[];
+          abortSignal: AbortSignal | undefined;
+          [key: string | number | symbol]: any;
+        },
+      ]
+    >;
     maxSteps: number;
     output: Output<OUTPUT, PARTIAL_OUTPUT> | undefined;
     providerOptions: ProviderOptions | undefined;

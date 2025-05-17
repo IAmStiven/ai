@@ -205,7 +205,7 @@ A function that attempts to repair a tool call that failed to parse.
         toolName: string;
         messages: ModelMessage[];
         abortSignal: AbortSignal | undefined;
-        [key: string]: any;
+        [key: string | number | symbol]: any;
       },
     ) => PromiseLike<
       [
@@ -215,7 +215,7 @@ A function that attempts to repair a tool call that failed to parse.
           toolName: string;
           messages: ModelMessage[];
           abortSignal: AbortSignal | undefined;
-          [key: string]: any;
+          [key: string | number | symbol]: any;
         },
       ]
     >;
@@ -553,7 +553,7 @@ async function executeTools<TOOLS extends ToolSet>({
       toolName: string;
       messages: ModelMessage[];
       abortSignal: AbortSignal | undefined;
-      [key: string]: any;
+      [key: string | number | symbol]: any;
     },
   ) => PromiseLike<
     [
@@ -563,7 +563,7 @@ async function executeTools<TOOLS extends ToolSet>({
         toolName: string;
         messages: ModelMessage[];
         abortSignal: AbortSignal | undefined;
-        [key: string]: any;
+        [key: string | number | symbol]: any;
       },
     ]
   >;
